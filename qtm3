@@ -1,0 +1,339 @@
+#!/usr/bin/env zsh
+
+# Qwen Task Manager 3.0 - Hybrid CLI
+# Combines rich UX with agentic architecture
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
+BASE_DIR="$HOME/qtm3"
+DB="$BASE_DIR/core.db"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m'
+
+# Ensure Python module is available
+if [[ ! -f "$SCRIPT_DIR/qtm3_core.py" ]]; then
+    echo -e "${RED}Error: qtm3_core.py not found${NC}"
+    exit 1
+fi
+
+# Initialize on first run
+if [[ ! -d "$BASE_DIR" ]]; then
+    echo -e "${YELLOW}First run - initializing Qwen Task Manager 3.0...${NC}"
+    python3 -c "
+from qtm3_core import TaskManagerCore, create_prompts
+from pathlib import Path
+core = TaskManagerCore()
+create_prompts(Path('$BASE_DIR'))
+print('✅ Initialized successfully')
+"
+fi
+
+# Quick capture function
+quick_capture() {
+    echo -e "${CYAN}✍️  Quick capture (one line):${NC}"
+    read -r task
+    
+    python3 -c "
+from qtm3_core import TaskManagerCore
+core = TaskManagerCore()
+task_id = core.create_task('$task')
+print(f'✅ Added: {task_id[:8]}... $task')
+"
+}
+
+# Brain dump with AI clarification
+brain_dump() {
+    echo -e "${BLUE}🧠 Brain dump mode (Ctrl+D when done):${NC}"
+    echo -e "${YELLOW}Dump everything: meetings, ideas, worries, tasks...${NC}\n"
+    
+    # Capture multiline input
+    tmpfile=$(mktemp)
+    cat > "$tmpfile"
+    
+    # Process with Qwen
+    echo -e "\n${GREEN}🤖 Processing with Qwen...${NC}"
+    
+    python3 -c "
+from qtm3_core import TaskManagerCore, QwenReasoning
+from pathlib import Path
+
+core = TaskManagerCore()
+qwen = QwenReasoning()
+
+raw_notes = Path('$tmpfile').read_text()
+tasks = qwen.clarify_tasks(raw_notes)
+
+for task in tasks:
+    task_id = core.create_task(
+        task['title'], 
+        task.get('description', '')
+    )
+    print(f'✅ {task[\"title\"]} (Energy: {task[\"energy_required\"]}, Time: {task[\"timer\"]}m)')
+
+print(f'\n📋 Added {len(tasks)} tasks to backlog')
+"
+    
+    rm -f "$tmpfile"
+}
+
+# Prioritize with context awareness
+prioritize() {
+    echo -e "${BLUE}🎯 Analyzing tasks with context awareness...${NC}"
+    
+    python3 -c "
+from qtm3_core import TaskManagerCore, QwenReasoning, PerceptionAgent
+from pathlib import Path
+import json
+
+core = TaskManagerCore()
+qwen = QwenReasoning()
+
+# Get backlog tasks
+tasks = core.get_tasks('backlog')
+
+# Scan for project context
+perception = PerceptionAgent([Path.home() / 'projects'])
+context = perception.scan_projects()
+context_summary = ' '.join([f'{k}: {v[:200]}' for k, v in context.items()])
+
+# Get prioritization
+strategy = qwen.prioritize_tasks(tasks, context_summary)
+
+# Display results
+print('\\n${GREEN}=== Today\\'s Strategy ===${NC}')
+print('\\n${YELLOW}🎯 Top 3 Priorities:${NC}')
+for task_id in strategy.get('immediate', []):
+    task = next((t for t in tasks if t['id'] == task_id), None)
+    if task:
+        print(f'  1. {task[\"title\"]}')
+
+print('\\n${CYAN}⚡ Quick Wins (< 15 min):${NC}')
+for task_id in strategy.get('quick_wins', []):
+    task = next((t for t in tasks if t['id'] == task_id), None)
+    if task:
+        print(f'  - {task[\"title\"]}')
+
+print('\\n${MAGENTA}🧠 Deep Work Blocks:${NC}')
+for task_id in strategy.get('deep_work', []):
+    task = next((t for t in tasks if t['id'] == task_id), None)
+    if task:
+        print(f'  - {task[\"title\"]} ({task.get(\"timer\", 45)}m)')
+
+# Update task priorities in database
+for i, task_id in enumerate(strategy.get('immediate', [])):
+    core.update_task_status(task_id, 'today')
+"
+}
+
+# View current state
+view_tasks() {
+    echo -e "${BLUE}📋 Current Tasks${NC}\n"
+    
+    # Today's tasks
+    echo -e "${YELLOW}Today:${NC}"
+    sqlite3 -column -header "$DB" "
+        SELECT substr(id, 1, 8) as id, title, energy_required, timer 
+        FROM tasks 
+        WHERE status = 'today' 
+        ORDER BY priority DESC
+    " | sed 's/|/ │ /g'
+    
+    echo -e "\n${CYAN}Backlog:${NC}"
+    sqlite3 -column -header "$DB" "
+        SELECT substr(id, 1, 8) as id, title, context 
+        FROM tasks 
+        WHERE status = 'backlog' 
+        ORDER BY created DESC 
+        LIMIT 10
+    " | sed 's/|/ │ /g'
+    
+    # Stats
+    total_backlog=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE status='backlog'")
+    total_done=$(sqlite3 "$DB" "SELECT COUNT(*) FROM tasks WHERE status='done'")
+    echo -e "\n${GREEN}Stats:${NC} $total_backlog backlog, $total_done completed"
+}
+
+# Daily reflection
+reflect() {
+    echo -e "${MAGENTA}🪞 Daily Reflection${NC}"
+    
+    # Get completed tasks
+    echo -e "${BLUE}What did you complete today? (task IDs or descriptions, Ctrl+D):${NC}"
+    tmpfile=$(mktemp)
+    cat > "$tmpfile"
+    
+    # Energy check
+    echo -e "\n${YELLOW}Energy levels (1-10):${NC}"
+    read -r "physical?Physical: "
+    read -r "mental?Mental: "
+    read -r "emotional?Emotional: "
+    
+    # Generate reflection
+    python3 -c "
+from qtm3_core import TaskManagerCore, QwenReasoning
+from pathlib import Path
+import json
+
+core = TaskManagerCore()
+qwen = QwenReasoning()
+
+completed_input = Path('$tmpfile').read_text().strip().split('\\n')
+completed_tasks = [line.strip() for line in completed_input if line.strip()]
+
+energy = {
+    'physical': ${physical:-5},
+    'mental': ${mental:-5},
+    'emotional': ${emotional:-5}
+}
+
+reflection = qwen.generate_reflection(completed_tasks, energy)
+
+# Save reflection
+import sqlite3
+from datetime import date
+conn = sqlite3.connect('$DB')
+conn.execute(
+    'INSERT INTO reflections (id, date, content, energy_physical, energy_mental, energy_emotional) VALUES (?, ?, ?, ?, ?, ?)',
+    (str(uuid.uuid4()), date.today(), reflection, energy['physical'], energy['mental'], energy['emotional'])
+)
+conn.commit()
+
+print('\\n${GREEN}=== Reflection ===${NC}')
+print(reflection)
+print('\\n✅ Reflection saved')
+"
+    
+    rm -f "$tmpfile"
+}
+
+# Search with vector similarity
+search_tasks() {
+    echo -e "${BLUE}🔍 Search (semantic + keyword):${NC}"
+    read -r query
+    
+    sqlite3 -column -header "$DB" "
+        SELECT substr(id, 1, 8) as id, title, status, context
+        FROM tasks
+        WHERE title LIKE '%$query%' 
+           OR description LIKE '%$query%'
+           OR context LIKE '%$query%'
+        ORDER BY 
+            CASE status 
+                WHEN 'today' THEN 1 
+                WHEN 'backlog' THEN 2 
+                ELSE 3 
+            END
+    " | sed 's/|/ │ /g'
+}
+
+# Weekly review
+weekly_review() {
+    echo -e "${MAGENTA}📊 Weekly Review${NC}\n"
+    
+    python3 -c "
+import sqlite3
+from datetime import datetime, timedelta
+
+conn = sqlite3.connect('$DB')
+
+# Task velocity
+week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+completed = conn.execute('SELECT COUNT(*) FROM tasks WHERE completed > ?', (week_ago,)).fetchone()[0]
+print(f'${GREEN}Tasks completed:${NC} {completed}')
+
+# Energy patterns
+avg_energy = conn.execute('''
+    SELECT 
+        AVG(energy_physical) as physical,
+        AVG(energy_mental) as mental,
+        AVG(energy_emotional) as emotional
+    FROM reflections
+    WHERE date > date(\"now\", \"-7 days\")
+''').fetchone()
+
+if avg_energy[0]:
+    print(f'\\n${YELLOW}Average energy:${NC}')
+    print(f'  Physical: {avg_energy[0]:.1f}/10')
+    print(f'  Mental: {avg_energy[1]:.1f}/10')
+    print(f'  Emotional: {avg_energy[2]:.1f}/10')
+
+# Recent reflections snippet
+print(f'\\n${CYAN}Recent reflections:${NC}')
+reflections = conn.execute('''
+    SELECT date, substr(content, 1, 100) || \"...\" as snippet
+    FROM reflections
+    ORDER BY date DESC
+    LIMIT 3
+''').fetchall()
+
+for date, snippet in reflections:
+    print(f'  {date}: {snippet}')
+"
+}
+
+# Timer integration
+set_timer() {
+    echo -e "${BLUE}⏰ Set task timer:${NC}"
+    
+    # Show today's tasks
+    sqlite3 -column "$DB" "SELECT substr(id, 1, 8) as id, title FROM tasks WHERE status='today'"
+    
+    echo -e "\n${YELLOW}Task ID:${NC}"
+    read -r task_id
+    echo -e "${YELLOW}Minutes:${NC}"
+    read -r minutes
+    
+    # Set timer using 'at' command
+    echo "qtm3 notify $task_id" | at now + $minutes minutes 2>/dev/null
+    echo -e "${GREEN}✅ Timer set for $minutes minutes${NC}"
+}
+
+# Main menu with fzf
+main_menu() {
+    while true; do
+        choice=$(cat <<EOF | fzf --height=15 --reverse --header="Qwen Task Manager 3.0"
+🧠 Brain Dump - AI-assisted capture
+➕ Quick Add - Single task
+🎯 Prioritize - Smart scheduling  
+📋 View Tasks - Current state
+🪞 Reflect - Daily journal
+🔍 Search - Semantic search
+📊 Weekly Review - Patterns
+⏰ Set Timer - Focus blocks
+🚪 Exit
+EOF
+)
+        
+        case "$choice" in
+            *"Brain Dump"*) brain_dump ;;
+            *"Quick Add"*) quick_capture ;;
+            *"Prioritize"*) prioritize ;;
+            *"View Tasks"*) view_tasks ;;
+            *"Reflect"*) reflect ;;
+            *"Search"*) search_tasks ;;
+            *"Weekly Review"*) weekly_review ;;
+            *"Set Timer"*) set_timer ;;
+            *"Exit"*) break ;;
+        esac
+        
+        echo -e "\n${YELLOW}Press Enter to continue...${NC}"
+        read -r
+    done
+}
+
+# Handle command line args
+case "$1" in
+    add) shift; quick_capture ;;
+    today) view_tasks ;;
+    reflect) reflect ;;
+    notify) echo -e "${GREEN}🔔 Time's up for task: $2${NC}" ;;
+    *) main_menu ;;
+esac

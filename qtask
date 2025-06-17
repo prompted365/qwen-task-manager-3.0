@@ -1,0 +1,27 @@
+#!/usr/bin/env zsh
+
+# Quick launcher with enhanced features
+# Add to your PATH or alias for easy access
+
+BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Quick capture mode
+if [[ "$1" == "add" ]]; then
+    shift
+    echo "- [ ] $*" >> "$BASE_DIR/tasks/backlog.txt"
+    echo "✅ Added: $*"
+    exit 0
+fi
+
+# Quick view mode
+if [[ "$1" == "today" ]]; then
+    if [[ -f "$BASE_DIR/tasks/today.txt" ]]; then
+        cat "$BASE_DIR/tasks/today.txt"
+    else
+        echo "No priorities set. Run task manager to prioritize."
+    fi
+    exit 0
+fi
+
+# Launch full interface
+exec "$BASE_DIR/run_task_manager.zsh" "$@"
