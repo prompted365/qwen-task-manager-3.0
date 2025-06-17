@@ -1,12 +1,13 @@
-# Qwen Local Task Manager
+# Qwen Task Manager 3.0
 
-A Claude-inspired task management system powered by your local Qwen 3 model, implementing behavioral activation principles and AI-assisted organization.
+Unified Task Manager with Agent-Layer Architecture - A Claude-inspired task management system powered by your local Qwen 3 model, implementing behavioral activation principles and AI-assisted organization.
 
 ## Features
 
 - **AI-Powered Task Clarification**: Transform messy brain dumps into structured, actionable tasks
 - **Strategic Prioritization**: Uses Qwen's reasoning to analyze impact, effort, and dependencies
 - **Behavioral Activation**: Daily reflection prompts based on psychological principles
+- **Agent-Layer Architecture**: Modular perception, memory, reasoning, and exchange layers
 - **Local-First**: All data stays on your machine, processed by your local Qwen model
 - **Claude-Style Thinking**: Leverages `/think` mode for deep analysis and synthesis
 
@@ -67,6 +68,10 @@ Run weekly to archive and analyze patterns:
 ```
 qwen_task_manager/
 ├── run_task_manager.zsh    # Main script
+├── agents.py              # Core agent framework
+├── bridge.py              # Unix socket IPC communication
+├── qtm3_core.py           # Core task management logic
+├── telemetry.py           # Behavioral loops and tracking
 ├── tasks/
 │   ├── backlog.txt        # All pending tasks
 │   ├── today.txt          # Today's priorities
