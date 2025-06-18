@@ -148,12 +148,28 @@ class ComponentRegistry:
                 result = conn.execute("""
                     SELECT * FROM components WHERE id = ?
                 """, (component_id,)).fetchone()
-                
+
                 return dict(result) if result else None
-                
+
         except sqlite3.Error as e:
             self.logger.error(f"Failed to get component: {e}")
             return None
+
+    def get_components_by_path(self, file_path: str) -> List[Dict[str, Any]]:
+        """Return components matching the provided file path"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                results = conn.execute(
+                    "SELECT * FROM components WHERE file_path = ?",
+                    (file_path,)
+                ).fetchall()
+
+                return [dict(row) for row in results]
+
+        except sqlite3.Error as e:
+            self.logger.error(f"Failed to get components by path: {e}")
+            return []
     
     def list_components(self, status: str = 'active', component_type: str = None) -> List[Dict[str, Any]]:
         """List components with optional filtering"""
@@ -252,7 +268,7 @@ class ComponentRegistry:
             self.logger.error(f"Failed to get drift metrics: {e}")
             return []
     
-    def store_component_flag(self, component_id: str, flag_level: str, 
+    def store_component_flag(self, component_id: str, flag_level: str,
                            drift_score: float, details: Dict[str, Any] = None) -> str:
         """Store component flag for attention"""
         flag_id = f"flag_{uuid.uuid4().hex[:8]}"
@@ -273,10 +289,14 @@ class ComponentRegistry:
                 
                 self.logger.info(f"Flagged component {component_id} as {flag_level}")
                 return flag_id
-                
+
         except sqlite3.Error as e:
             self.logger.error(f"Failed to store component flag: {e}")
             raise
+
+    def flag_component(self, component_id: str, flag_level: str, details: str) -> str:
+        """Record a simple flag for a component"""
+        return self.store_component_flag(component_id, flag_level, 0.0, {"details": details})
     
     def get_flagged_components(self, flag_level: str = None) -> List[Dict[str, Any]]:
         """Get components requiring attention"""
