@@ -12,6 +12,22 @@ ARCHIVE="$BASE_DIR/tasks/archive"
 PROMPT_DIR="$BASE_DIR/prompts"
 MODEL="qwen3:30b-a3b"
 
+# Registry database path can be provided via --registry or REGISTRY_DB env var
+REGISTRY_DB=${REGISTRY_DB:-}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --registry)
+            REGISTRY_DB="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
 # Colors for better UX
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -185,6 +201,13 @@ show_stats() {
     echo -e "📁 Archives: ${YELLOW}$(ls -1 "$ARCHIVE" 2>/dev/null | wc -l)${NC}"
 }
 
+# Function: Registry CLI
+registry_cli_menu() {
+    echo -e "${BLUE}🗄️  Registry CLI arguments (leave blank for help):${NC}"
+    read -r args
+    python3 "$BASE_DIR/registry_cli.py" ${REGISTRY_DB:+--db "$REGISTRY_DB"} $args
+}
+
 # Main Menu
 main_menu() {
     while true; do
@@ -197,9 +220,10 @@ main_menu() {
         echo "6) 📦 Archive"
         echo "7) 🔍 Search"
         echo "8) 📊 Stats"
-        echo "9) 🚪 Exit"
+        echo "9) 🗄️  Registry CLI"
+        echo "10) 🚪 Exit"
         
-        read -r "choice?Choose [1-9]: "
+        read -r "choice?Choose [1-10]: "
         
         case $choice in
             1) capture ;;
@@ -210,7 +234,8 @@ main_menu() {
             6) archive_tasks ;;
             7) search_tasks ;;
             8) show_stats ;;
-            9) echo -e "${GREEN}👋 Keep being awesome!${NC}"; break ;;
+            9) registry_cli_menu ;;
+            10) echo -e "${GREEN}👋 Keep being awesome!${NC}"; break ;;
             *) echo -e "${RED}Invalid choice${NC}" ;;
         esac
     done
