@@ -29,8 +29,9 @@ Unified Task Manager with Agent-Layer Architecture - A Claude-inspired task mana
 
 3. **Run the task manager**:
    ```bash
-   ./run_task_manager.zsh
+   ./run_task_manager.zsh [--registry /path/to/registry.db]
    ```
+   Or set `REGISTRY_DB=/path/to/registry.db` before running.
 
 ## Usage Guide
 
@@ -117,6 +118,10 @@ Use `registry_cli.py` to manage USS components:
 ./registry_cli.py flag comp_xxxx critical "needs review"
 ./registry_cli.py resolve comp_xxxx --by alice
 ```
+
+You can also open the registry CLI from the task manager menu (Option 9).
+It uses the database path specified with `--registry` or the `REGISTRY_DB`
+environment variable.
 
 
 ## Customization
