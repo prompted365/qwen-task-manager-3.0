@@ -100,6 +100,25 @@ For complex projects, use the project breakdown template:
 # Then run through Ollama manually
 ```
 
+## Component Registry CLI
+Use `registry_cli.py` to manage USS components:
+
+```bash
+# Register a component
+./registry_cli.py register --name MyComp --type module --file-path path/to/file
+
+# List all components
+./registry_cli.py list
+
+# Show component details and latest story
+./registry_cli.py show comp_xxxx --story
+
+# Flag or resolve
+./registry_cli.py flag comp_xxxx critical "needs review"
+./registry_cli.py resolve comp_xxxx --by alice
+```
+
+
 ## Customization
 
 ### Modify Prompts
